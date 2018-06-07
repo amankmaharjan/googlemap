@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+        /* Always set the map height explicitly to define the size of the div
+         * element that contains the map. */
+        #map {
+            height: 80%;
+        }
+
+        /* Optional: Makes the sample page fill the window. */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+
+<body>
+<br>
+<input type="text" placeholder="enter place to search" id="input_search" value="balaju" name="search"/>
+<button id="search">Search</button>
+<br>
+<script>
+
+
+</script>
+<div id="map"></div>
+<div id="detail">
+    <h2>name:</h2>
+    <h3></h3>
+</div>
+<script>
+
+
+    function initMap() {
+        var ktm = new google.maps.LatLng(27.700769, 85.300140);
+        var map = new google.maps.Map(document.getElementById('map'), {
+            center: ktm,
+            zoom: 13
+        });
+        var marker = null;
+        var markers = [];
+        var gymHouseList = null;
+        var infowindow = new google.maps.InfoWindow();
+
+
+        $("#search").click(function () {
+            $.ajax({
+                url: "http://localhost:8080/gymhouse/" + $("#input_search").val()
+            }).then(function (data) {
+
+                gymHouseList = data;
+                var i;
+                deleteMarkers();
+                map.zoom=13;
+                google.maps.event.trigger(map, 'resize');
+                for (i = 0; i < gymHouseList.length; i++) {
+                    console.log(gymHouseList[i]);
+                    addMarker(i);
+
+                }
+            });
+        });
+
+
+        // Sets the map on all markers in the array.
+        function setMapOnAll(map) {
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(map);
+            }
+        }
+
+        // Removes the markers from the map, but keeps them in the array.
+        function clearMarkers() {
+            setMapOnAll(null);
+        }
+
+        // Shows any markers currently in the array.
+        function showMarkers() {
+            setMapOnAll(map);
+        }
+
+        // Deletes all markers in the array by removing references to them.
+        function deleteMarkers() {
+            clearMarkers();
+            markers = [];
+
+        }
+
+        function addMarker(i) {
+            marker = new google.maps.Marker({
+                position: new google.maps.LatLng(gymHouseList[i].location.latitude, gymHouseList[i].location.longitude),
+                map: map
+            });
+            markers.push(marker);
+
+            google.maps.event.addListener(marker, 'dblclick', (function (marker, i) {
+                return function () {
+                    infowindow.setContent(gymHouseList[i].name+gymHouseList[i].location.name);
+                    infowindow.open(map, marker);
+                    map.zoom=15;
+                }
+            })(marker, i));
+            google.maps.event.addListener(marker, 'click', (function (marker, i) {
+                return function () {
+                    infowindow.setContent(gymHouseList[i].name);
+                    infowindow.open(map, marker);
+                    map.zoom=15;
+                }
+            })(marker, i));
+        }
+
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCmDzNapYvBM7xs95lX5Hh5tEKFZyJWYwk&callback=initMap"
+        async defer></script>
+</body>
+</html>
+
+

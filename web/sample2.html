@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+        #map {
+            height: 80%;
+        }
+
+        /* Optional: Makes the sample page fill the window. */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+
+<body>
+<br>
+<input type="text" placeholder="enter place to search" id="input_search" value="gym nearby balaju" name="search"/>
+<button id="search">Search</button>
+<br>
+<script>
+    const key = "AIzaSyCmDzNapYvBM7xs95lX5Hh5tEKFZyJWYwk";
+
+</script>
+<div id="map"></div>
+<div id="detail">
+    <table border="1">
+        <tr>
+            <th>name:</th>
+            <th>rating:</th>
+            <th>open</th>
+            <th>address</th>
+            <th>phone no</th>
+            <th>website link</th>
+            <th>extra info</th>
+            <th>vicinity</th>
+            <th>open time</th>
+            <!--<th>close hour</th>-->
+        </tr>
+        <tr>
+            <td id="name"></td>
+            <td id="rating"></td>
+            <td id="open"></td>
+            <td id="address"></td>
+            <td id="phoneno"></td>
+            <td id="website"></td>
+            <td id="extra"></td>
+            <td id="vicinity"></td>
+            <td id="opentime"></td>
+            <!--<td id="closehour"></td>-->
+
+
+        </tr>
+
+    </table>
+</div>
+<script>
+
+    var infoWindow;
+
+
+    function initMap() {
+
+        var ktm = new google.maps.LatLng(27.700769, 85.300140);
+
+        var map = new google.maps.Map(document.getElementById('map'), {
+            center: ktm,
+            zoom: 13
+        });
+        // infoWindow = new google.maps.InfoWindow;
+        //
+        // // Try HTML5 geolocation.
+        // if (navigator.geolocation) {
+        //     navigator.geolocation.getCurrentPosition(function(position) {
+        //         var pos = {
+        //             lat: position.coords.latitude,
+        //             lng: position.coords.longitude
+        //         };
+        //
+        //         infoWindow.setPosition(pos);
+        //         infoWindow.setContent('Location found.');
+        //         infoWindow.open(map);
+        //         map.setCenter(pos);
+        //     }, function() {
+        //         handleLocationError(true, infoWindow, map.getCenter());
+        //     });
+        // } else {
+        //     // Browser doesn't support Geolocation
+        //     handleLocationError(false, infoWindow, map.getCenter());
+        // }
+
+
+        var marker = null;
+        var markers = [];
+        var gymHouseList = null;
+        var infowindow = new google.maps.InfoWindow();
+        var baseurl = "https://maps.googleapis.com/maps/api/place/textsearch/json?key=" + key + "&query=";
+        var placesearchurl = "https://maps.googleapis.com/maps/api/place/details/json?key=" + key + "&placeid=";
+        var nearestLocationurl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?&radius=1500&key=" + key;
+
+
+        $("#search").click(function () {
+            var url = null;
+            var query = $("#input_search").val();
+            if (query.includes("spa")) {
+                url = generateSpaQuery(query);
+            }
+            else if (query.includes("gym")) {
+
+                url = generateGymQuery(query);
+            }
+            else {
+                promptSearchFormat();
+            }
+
+            var tokens = generateTokens(query);
+            var location = tokens[tokens.length - 1];
+
+            $.ajax({
+                url: "https://maps.googleapis.com/maps/api/geocode/json?address=" + location + " Nepal" + "&key=" + key
+            }).then(function (data) {
+
+                if (data.results == null) {
+                    promptSearchFormat("Address not found");
+                    return;
+                }
+                var latlong = {};
+                latlong.lat = data.results[0].geometry.location.lat;
+                latlong.lng = data.results[0].geometry.location.lng;
+                map.setCenter(latlong);
+                url = addlocation(latlong, url);
+                populateGymHouses(url);
+            });
+
+
+        });
+
+        var addlocation = function (latlong, url) {
+
+            return url + "&location=" + latlong.lat + "," + latlong.lng
+        };
+
+
+        function populateGymHouses(url) {
+            $.ajax({
+                url: url
+            }).then(function (data) {
+
+                gymHouseList = data.results;
+
+                var i;
+                deleteMarkers();
+                map.setZoom(13);
+                if (gymHouseList.length < 1) {
+                    promptSearchFormat("No gym house results found.");
+                    return;
+
+                }
+
+                map.setZoom(13);
+                for (i = 0; i < gymHouseList.length; i++) {
+                    console.log(gymHouseList[i]);
+                    addMarker(i);
+
+                }
+            });
+        }
+
+
+        // Sets the map on all markers in the array.
+        function setMapOnAll(map) {
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(map);
+            }
+        }
+
+        // Removes the markers from the map, but keeps them in the array.
+        function clearMarkers() {
+            setMapOnAll(null);
+        }
+
+        // Shows any markers currently in the array.
+        function showMarkers() {
+            setMapOnAll(map);
+        }
+
+        // Deletes all markers in the array by removing references to them.
+        function deleteMarkers() {
+            clearMarkers();
+            markers = [];
+
+        }
+
+        //adds  new marker
+        function addMarker(i) {
+            marker = new google.maps.Marker({
+                position: new google.maps.LatLng(gymHouseList[i].geometry.location.lat, gymHouseList[i].geometry.location.lng),
+                map: map
+            });
+            markers.push(marker);
+            google.maps.event.addListener(marker, 'click', (populateMarker)(marker, i));
+        }
+
+        var populateMarker = function (marker, i) {
+            return function () {
+
+                infowindow.setContent(gymHouseList[i].name);
+                infowindow.open(map, marker);
+                var url = placesearchurl + gymHouseList[i].place_id;
+
+                $.ajax({
+                    url: url
+                }).then(function (data) {
+                    console.log(data.result);
+                    var place = data.result;
+                    $("#name").html(gymHouseList[i].name);
+                    $("#rating").html(gymHouseList[i].rating);
+                    $("#address").html(gymHouseList[i].formatted_address);
+                    $("#phoneno").html(place.formatted_phone_number);
+
+                    $("#vicinity").html(place.vicinity);
+                    if (place.opening_hours == null) {
+                        $("#opentime").html("not available");
+                        $("#open").html("not available");
+
+                    }
+                    else {
+                        $("#opentime").html(place.opening_hours.weekday_text[new Date().getDay() - 1]);
+                        $("#open").html(place.opening_hours.open_now);
+                    }
+                    map.setZoom(15);
+                    map.setCenter(place.geometry.location);
+
+
+                });
+            }
+        }
+
+        function generateTokens(query) {
+            return query.split(/\s+|,/);
+        }
+
+        function generateSpaQuery(query) {
+            var tokens = generateTokens(query);
+            query = nearestLocationurl + "&type=spa";
+            return query;
+
+
+        }
+
+        function generateGymQuery(query) {
+            query = nearestLocationurl + "&type=gym";
+            return query;
+        }
+
+        function promptSearchFormat() {
+
+
+            promptSearchFormat(null);
+        }
+
+        function promptSearchFormat(message) {
+
+            alert(message + "Please enter correct keyword in format i.e \n 1.Gym, Balaju  or Gym nearby Balaju \n 2.Spa, Balaju or Spa nearby Balaju");
+        }
+
+        function getLatLong(location) {
+            $.ajax({
+                url: "https://maps.googleapis.com/maps/api/geocode/json?address=" + location + "&key=" + key
+            }).then(function (data) {
+
+                var latlong = data.results.geometry.location;
+                return latlong;
+            });
+        }
+
+
+    }
+
+    // function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+    //     infoWindow.setPosition(pos);
+    //     infoWindow.setContent(browserHasGeolocation ?
+    //         'Error: The Geolocation service failed.' :
+    //         'Error: Your browser doesn\'t support geolocation.');
+    //     infoWindow.open(map);
+    // }
+
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCmDzNapYvBM7xs95lX5Hh5tEKFZyJWYwk&callback=initMap"
+        async defer></script>
+</body>
+</html>
+
+
